@@ -131,6 +131,16 @@ it("Clamps hue (angle) value properly", () => {
   expect(colord({ h: -400, s: 50, v: 50 }).toHsv().h).toBe(320);
 });
 
+it("Preserves HSL object hue when RGB cannot represent it", () => {
+  const black = colord({ h: 191, s: 100, l: 0, a: 0.5 });
+  expect(black.toHsl()).toMatchObject({ h: 191, s: 0, l: 0, a: 0.5 });
+  expect(black.toHslString()).toBe("hsla(191, 0%, 0%, 0.5)");
+  expect(black.hue()).toBe(191);
+
+  expect(colord({ h: 191, s: 0, l: 50 }).toHsl().h).toBe(191);
+  expect(colord({ h: 191, s: 100, l: 100 }).toHsl().h).toBe(191);
+});
+
 it("Supports all valid CSS angle units", () => {
   // https://developer.mozilla.org/en-US/docs/Web/CSS/angle#examples
   expect(colord("hsl(90deg, 50%, 50%)").toHsl().h).toBe(90);
@@ -255,6 +265,12 @@ it("Changes a hue value", () => {
   expect(colord("hsl(90, 50%, 50%)").hue(0).toHslString()).toBe("hsl(0, 50%, 50%)");
   expect(colord("hsl(90, 50%, 50%)").hue(180).toHslString()).toBe("hsl(180, 50%, 50%)");
   expect(colord("hsl(90, 50%, 50%)").hue(370).toHslString()).toBe("hsl(10, 50%, 50%)");
+  expect(colord({ r: 1, g: 2, b: 3 }).hue(210).toRgb()).toMatchObject({
+    r: 1,
+    g: 2,
+    b: 3,
+    a: 1,
+  });
 });
 
 it("Rotates a hue circle", () => {

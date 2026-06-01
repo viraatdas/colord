@@ -1,12 +1,11 @@
 import { Input, AnyColor, RgbaColor, HslaColor, HsvaColor } from "./types";
-import { round } from "./helpers";
+import { clampHue, round } from "./helpers";
 import { ALPHA_PRECISION } from "./constants";
 import { parse } from "./parse";
 import { rgbaToHex } from "./colorModels/hex";
 import { roundRgba } from "./colorModels/rgb";
 import { rgbaToRgbaString } from "./colorModels/rgbString";
 import { rgbaToHsla, roundHsla } from "./colorModels/hsl";
-import { rgbaToHslaString } from "./colorModels/hslString";
 import { rgbaToHsva, roundHsva } from "./colorModels/hsv";
 import { changeAlpha } from "./manipulate/changeAlpha";
 import { saturate } from "./manipulate/saturate";
@@ -14,14 +13,25 @@ import { getBrightness } from "./get/getBrightness";
 import { lighten } from "./manipulate/lighten";
 import { invert } from "./manipulate/invert";
 
+const getHslaInputHue = (input: Input): number | undefined => {
+  if (typeof input !== "object" || input === null) return undefined;
+
+  const hue = clampHue(Number(input.h));
+  return hue === 360 ? 0 : hue;
+};
+
 export class Colord {
   private readonly parsed: RgbaColor | null;
+  private readonly hslaHue?: number;
   readonly rgba: RgbaColor;
 
   constructor(input: AnyColor) {
     // Internal color format is RGBA object.
     // We do not round the internal RGBA numbers for better conversion accuracy.
-    this.parsed = parse(input as Input)[0];
+    const [parsed, format] = parse(input as Input);
+
+    this.parsed = parsed;
+    this.hslaHue = format === "hsl" ? getHslaInputHue(input as Input) : undefined;
     this.rgba = this.parsed || { r: 0, g: 0, b: 0, a: 1 };
   }
 
@@ -86,7 +96,8 @@ export class Colord {
    * Always includes an alpha value from 0 to 1.
    */
   public toHsl(): HslaColor {
-    return roundHsla(rgbaToHsla(this.rgba));
+    const hsla = rgbaToHsla(this.rgba);
+    return roundHsla(this.hslaHue === undefined ? hsla : { ...hsla, h: this.hslaHue });
   }
 
   /**
@@ -94,7 +105,8 @@ export class Colord {
    * Always includes an alpha value from 0 to 1.
    */
   public toHslString(): string {
-    return rgbaToHslaString(this.rgba);
+    const { h, s, l, a } = this.toHsl();
+    return a < 1 ? `hsla(${h}, ${s}%, ${l}%, ${a})` : `hsl(${h}, ${s}%, ${l}%)`;
   }
 
   /**
@@ -170,9 +182,12 @@ export class Colord {
   public hue(): number;
   public hue(value: number): Colord;
   public hue(value?: number): Colord | number {
-    const hsla = rgbaToHsla(this.rgba);
-    if (typeof value === "number") return colord({ h: value, s: hsla.s, l: hsla.l, a: hsla.a });
-    return round(hsla.h);
+    if (typeof value === "number") {
+      const hsla = rgbaToHsla(this.rgba);
+      return colord({ h: value, s: hsla.s, l: hsla.l, a: hsla.a });
+    }
+
+    return this.toHsl().h;
   }
 
   /**
